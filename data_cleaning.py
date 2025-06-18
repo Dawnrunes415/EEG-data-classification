@@ -96,8 +96,7 @@ X_val_bal = bandpass_filter(X_val_bal, lowcut=0.5, highcut=40, fs=256)
 
 
 ########## Downsampling ##########
-# I move this part after artifacts and noise removal because it make sense to clean the data first 
-# though i was thinking to downsample first when writing the proposal....
+# I move this part after artifacts and noise removal because it makes sense to clean the data first 
 
 
 
