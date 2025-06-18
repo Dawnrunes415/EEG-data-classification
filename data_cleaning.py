@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd 
 import matplotlib.pyplot as plt
+from scipy.signal import resample
+from scipy.signal import butter, filtfilt
 
 ########## Loading the datasets ##########
 # Load the training dataset 
@@ -38,7 +40,7 @@ print("Balanced validation labels:", np.unique(y_val, return_counts=True))
 seizure_percent_val = np.sum(y_val == 1) / len(y_val) * 100
 print('% Seizure in the bal.validation set:', seizure_percent_val, '%') # 22.44%
 
-########## Visualize the data ##########
+########## Visualizing the data ##########
 # Visualize the first five samples in the training set 
 for i in range(5):
     sample_signal = X_train[i]
@@ -65,6 +67,43 @@ for i in range(5):
     # Save the figure into the eeg_graphs folder
     plt.savefig(f"eeg_graphs/sample_{i+1}.png")
     #plt.show()
+    plt.close()
+
+
+########## Noise removal using bandpass filter ##########
+def bandpass_filter(data, lowcut, highcut, fs, order=4):
+    nyq = 0.5 * fs
+    # Normalize cutoff frequencies 
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = butter(order, [low, high], btype='band')
+
+    # Apply the filter to each signal (each channel in each sample)
+    filtered = np.empty_like(data)
+    for i in range(data.shape[0]):      
+        for c in range(data.shape[1]):  
+            filtered[i, c, :] = filtfilt(b, a, data[i, c, :])
+    return filtered
+
+X_train = bandpass_filter(X_train, lowcut=0.5, highcut=40, fs=256)
+X_val = bandpass_filter(X_val, lowcut=0.5, highcut=40, fs=256)
+X_val_bal = bandpass_filter(X_val_bal, lowcut=0.5, highcut=40, fs=256)
+
+
+########## Artifacts removal ##########
+
+
+
+
+########## Downsampling ##########
+# I move this part after artifacts and noise removal because it make sense to clean the data first 
+# though i was thinking to downsample first when writing the proposal....
+
+
+
+
+
+########## Normalization ##########
 
 
 
