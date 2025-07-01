@@ -3,7 +3,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import resample
 from scipy.signal import butter, filtfilt
+# if you see: ModuleNotFoundError: No module named 'pywt'
+# then "pip install PyWavelets"
 import pywt
+from sklearn.preprocessing import StandardScaler
 
 ########## Loading the datasets ##########
 # Load the training dataset 
@@ -152,6 +155,7 @@ def denoise(dataset):
         denoised_dataset.append(denoised_channel)
     return np.array(denoised_dataset)
 
+# Plotting the first 5 graphs for visualization.
 for i in range(5):
     sample_signal = X_train[i]
     denoised = denoise(sample_signal)
@@ -187,14 +191,21 @@ for i in range(5):
 # Changed from downsampling -> upweighting as it avoids the challenges of insufficient data;
 # yet ensured balanced data.
 
-
-
 ########## Normalization ##########
 
+# 2D flatten the training data to (8282, 23*256)
+# 2D flatten the validation data to (1462, 23*256)
+X_train_2d = X_train.reshape(X_train.shape[0], -1)
+X_val_bal_2d = X_val_bal.reshape(X_val_bal.shape[0], -1)
 
+# Standardize to mean = 0, standard deviation = 1
+# Only using transform yet not fit for validation data because
+# don't want model to know the fitting parameters!
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train_2d)
+X_val_bal_scaled = scaler.transform(X_val_bal_2d)
 
-
-
-
-
-
+# Reshape training data from (8282, 23*256) to (8282, 23, 256)
+# Reshape validation data from (1462, 23*256) to (1462, 23, 256)
+X_train_final = X_train_scaled.reshape(X_train.shape)
+X_val_bal_final = X_val_bal_scaled.reshape(X_val_bal.shape)
