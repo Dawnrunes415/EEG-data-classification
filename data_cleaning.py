@@ -209,3 +209,13 @@ X_val_bal_scaled = scaler.transform(X_val_bal_2d)
 # Reshape validation data from (1462, 23*256) to (1462, 23, 256)
 X_train_final = X_train_scaled.reshape(X_train.shape)
 X_val_bal_final = X_val_bal_scaled.reshape(X_val_bal.shape)
+
+########## Saving Data ##########
+
+np.savez_compressed(
+    'processed_eeg_data.npz',
+    X_train=X_train_final,
+    X_val=X_val_bal_final,
+    y_train=y_train,
+    y_val=y_val
+)
