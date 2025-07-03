@@ -217,5 +217,5 @@ np.savez_compressed(
     X_train=X_train_final,
     X_val=X_val_bal_final,
     y_train=y_train,
-    y_val=y_val
+    y_val=y_val_bal
 )
