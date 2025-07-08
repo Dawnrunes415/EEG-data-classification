@@ -46,9 +46,9 @@ print("Balanced validation labels:", np.unique(y_val, return_counts=True))
 seizure_percent_val = np.sum(y_val == 1) / len(y_val) * 100
 print('% Seizure in the bal.validation set:', seizure_percent_val, '%') # 22.44%
 
-'''
-
 ########## Visualizing the data ##########
+
+'''
 # Visualize the first five samples in the training set 
 for i in range(5):
     sample_signal = X_train[i]
@@ -76,6 +76,7 @@ for i in range(5):
     plt.savefig(f"eeg_graphs/sample_{i+1}.png")
     #plt.show()
     plt.close()
+'''
 
 ########## Noise removal using bandpass filter ##########
 def bandpass_filter(data, lowcut, highcut, fs, order=4):
@@ -96,20 +97,7 @@ X_train = bandpass_filter(X_train, lowcut=0.5, highcut=40, fs=256)
 X_val = bandpass_filter(X_val, lowcut=0.5, highcut=40, fs=256)
 X_val_bal = bandpass_filter(X_val_bal, lowcut=0.5, highcut=40, fs=256)
 
-'''
-
 ########## Artifacts removal ##########
-
-# This is a helper function to avoid invalid true-divide of soft thresholding.
-# I do not like ValueError, this really shouldn't be here, very unhealthy, but let it be now.
-def safe_soft_threshold(coeff):
-    m_coeff = []
-    for c in coeff:
-        if c == 0:
-            m_coeff.append(1e-8)
-        else:
-            m_coeff.append(c)
-    return m_coeff
 
 # This function uses PyWavelets to remove artifacts.
 # Level - Range: [1, max_level], Meaning: differentiate approximation and detail of wavelets
@@ -123,6 +111,9 @@ def wavelet_denoise(data, level=None, mode='soft'):
     # db4 being the best time/frequency cutoff for EEG signals
     wavelet = "db4"
 
+    if np.std(data) < 1e-4:
+        return data.copy()
+    
     if level is None:
         # will use the maximal level if level is None (default)
         level = pywt.dwt_max_level(len(data), pywt.Wavelet(wavelet).dec_len)
@@ -136,15 +127,20 @@ def wavelet_denoise(data, level=None, mode='soft'):
 
     # Median Absolute Deviation method:
     # using the highest layer of coeffs (represent high frequency, usually noises)
-    sigma = np.median(np.abs(coeffs[-1])) / 0.6745
+    detail_coeffs = coeffs[-1]
+    sigma = np.median(np.abs(detail_coeffs)) / 0.6745
     # Remove coeffs of what likely to be random noises
+
+    if np.isclose(sigma, 0):
+        return data.copy()
+
     universal_threshold = sigma * np.sqrt(2 * np.log(len(data)))
 
     # coeffs[0] are the ones that describe the most general pattern
     coeffs_thresh = [coeffs[0]]
+
     for i in range(1, len(coeffs)):
-        # perform soft thresholding
-        coeffs_thresh.append(pywt.threshold(safe_soft_threshold(coeffs[i]), value=universal_threshold, mode=mode))
+        coeffs_thresh.append(pywt.threshold(coeffs[i], value=universal_threshold, mode=mode))
     
     # Multileverl reconstruct EEG signals
     return pywt.waverec(coeffs_thresh, wavelet)
@@ -187,12 +183,6 @@ for i in range(5):
     plt.savefig(f"eeg_denoised_graphs/sample_{i+1}.png")
     plt.close()
 
-########## Upweighting ##########
-# I move this part after artifacts and noise removal because it makes sense to clean the data first 
-
-# Changed from downsampling -> upweighting as it avoids the challenges of insufficient data;
-# yet ensured balanced data.
-
 ########## Normalization ##########
 
 # 2D flatten the training data to (8282, 23*256)
@@ -214,6 +204,7 @@ X_val_bal_final = X_val_bal_scaled.reshape(X_val_bal.shape)
 
 ########## Saving Data ##########
 
+# This is the ONLY normalized one
 np.savez_compressed(
     'processed_eeg_data.npz',
     X_train=X_train_final,
@@ -221,3 +212,13 @@ np.savez_compressed(
     y_train=y_train,
     y_val=y_val_bal
 )
+
+# This is the denoised + normalized one
+np.savez_compressed(
+    'denoised_eeg_data.npz',
+    X_train=denoise(X_train_final),
+    X_val=denoise(X_val_bal_final),
+    y_train=y_train,
+    y_val=y_val_bal
+)
+
