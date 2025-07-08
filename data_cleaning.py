@@ -9,20 +9,21 @@ from sklearn.preprocessing import StandardScaler
 
 ########## Loading the datasets ##########
 # Load the training dataset 
-train_data = np.load('data/eeg-predictive_train.npz')
+
+train_data = np.load('C:/Users/andre/OneDrive/Documents/data/eeg-predictive_train.npz')
 print(train_data.files) # Check the keys in the npz file
 X_train = train_data['train_signals']
 y_train = train_data['train_labels']
 
 # Load the validation dataset 
-val_data = np.load('data/eeg-predictive_val.npz')
+val_data = np.load('C:/Users/andre/OneDrive/Documents/data/eeg-predictive_val.npz')
 X_val = val_data['val_signals']
 y_val = val_data['val_labels']
 
 # Load the balanced validation dataset 
 # The balanced datset is a subset of the validation dataset so we will be using this for validation 
 # Not balanced validation dataset will be processed and used if the balanced validation dataset is not enough
-val_bal_data = np.load('data/eeg-predictive_val_balanced.npz')
+val_bal_data = np.load('C:/Users/andre/OneDrive/Documents/data/eeg-predictive_val_balanced.npz')
 X_val_bal = val_bal_data['val_signals']
 y_val_bal = val_bal_data['val_labels']
 
