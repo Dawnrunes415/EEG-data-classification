@@ -79,7 +79,7 @@ for i in range(5):
 '''
 
 ########## Noise removal using bandpass filter ##########
-def bandpass_filter(data, lowcut, highcut, fs, order=4):
+def bandpass_filter(data, lowcut, highcut, fs, order=5):
     nyq = 0.5 * fs
     # Normalize cutoff frequencies 
     low = lowcut / nyq
@@ -185,39 +185,43 @@ for i in range(5):
 
 ########## Normalization ##########
 
-# 2D flatten the training data to (8282, 23*256)
-# 2D flatten the validation data to (1462, 23*256)
-X_train_2d = X_train.reshape(X_train.shape[0], -1)
-X_val_bal_2d = X_val_bal.reshape(X_val_bal.shape[0], -1)
+def normalization(X_train, X_val_bal):
+    # 2D flatten the training data to (8282, 23*256)
+    # 2D flatten the validation data to (1462, 23*256)
+    X_train_2d = X_train.reshape(X_train.shape[0], -1)
+    X_val_bal_2d = X_val_bal.reshape(X_val_bal.shape[0], -1)
 
-# Standardize to mean = 0, standard deviation = 1
-# Only using transform yet not fit for validation data because
-# don't want model to know the fitting parameters!
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train_2d)
-X_val_bal_scaled = scaler.transform(X_val_bal_2d)
+    # Standardize to mean = 0, standard deviation = 1
+    # Only using transform yet not fit for validation data because
+    # don't want model to know the fitting parameters!
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train_2d)
+    X_val_bal_scaled = scaler.transform(X_val_bal_2d)
 
-# Reshape training data from (8282, 23*256) to (8282, 23, 256)
-# Reshape validation data from (1462, 23*256) to (1462, 23, 256)
-X_train_final = X_train_scaled.reshape(X_train.shape)
-X_val_bal_final = X_val_bal_scaled.reshape(X_val_bal.shape)
+    # Reshape training data from (8282, 23*256) to (8282, 23, 256)
+    # Reshape validation data from (1462, 23*256) to (1462, 23, 256)
+    X_train_final = X_train_scaled.reshape(X_train.shape)
+    X_val_bal_final = X_val_bal_scaled.reshape(X_val_bal.shape)
+    return X_train_final, X_val_bal_final
 
 ########## Saving Data ##########
 
-# This is the ONLY normalized one
+# This is the denoised + normalized one
+X_train_norm_denoise, X_val_norm_denoise = normalization(denoise(X_train),denoise(X_val_bal))
 np.savez_compressed(
-    'processed_eeg_data.npz',
-    X_train=X_train_final,
-    X_val=X_val_bal_final,
+    'denoised_eeg_data.npz',
+    X_train=X_train_norm_denoise,
+    X_val=X_val_norm_denoise,
     y_train=y_train,
     y_val=y_val_bal
 )
 
-# This is the denoised + normalized one
+# This is the ONLY normalized one
+X_train_norm, X_val_norm = normalization(X_train,X_val_bal)
 np.savez_compressed(
-    'denoised_eeg_data.npz',
-    X_train=denoise(X_train_final),
-    X_val=denoise(X_val_bal_final),
+    'processed_eeg_data.npz',
+    X_train=X_train_norm,
+    X_val=X_val_norm,
     y_train=y_train,
     y_val=y_val_bal
 )
