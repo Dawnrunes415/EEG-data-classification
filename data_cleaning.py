@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler
 ########## Loading the datasets ##########
 # Load the training dataset 
 
-path = '' # Change this to the location of your local data folder
+path = "D:\\Vanessa\\Documents\\eeg_data\\" # Change this to the location of your local data folder
 
 train_data = np.load(path+'eeg-predictive_train.npz')
 print(train_data.files) # Check the keys in the npz file
@@ -79,23 +79,26 @@ for i in range(5):
 '''
 
 ########## Noise removal using bandpass filter ##########
-def bandpass_filter(data, lowcut, highcut, fs, order=5):
+def create_bandpass_filter(lowcut, highcut, fs, order=5):
     nyq = 0.5 * fs
     # Normalize cutoff frequencies 
     low = lowcut / nyq
     high = highcut / nyq
     b, a = butter(order, [low, high], btype='band')
+    return b, a
 
+def bandpass_filter(data, b, a):
     # Apply the filter to each signal (each channel in each sample)
-    filtered = np.empty_like(data)
+    filtered = np.zeros_like(data)
     for i in range(data.shape[0]):      
         for c in range(data.shape[1]):  
             filtered[i, c, :] = filtfilt(b, a, data[i, c, :])
     return filtered
 
-X_train = bandpass_filter(X_train, lowcut=0.5, highcut=40, fs=256)
-X_val = bandpass_filter(X_val, lowcut=0.5, highcut=40, fs=256)
-X_val_bal = bandpass_filter(X_val_bal, lowcut=0.5, highcut=40, fs=256)
+b, a = create_bandpass_filter(lowcut=0.5, highcut=40, fs=256)
+X_train = bandpass_filter(X_train, b, a)
+X_val = bandpass_filter(X_val, b, a)
+X_val_bal = bandpass_filter(X_val_bal, b, a)
 
 ########## Artifacts removal ##########
 
@@ -233,8 +236,10 @@ def normalization(X, scalers):
 
 ########## Saving Data ##########
 
+scalers = get_scalers(X_train)
+
 # This is the denoised + normalized one
-X_train_norm_denoise, X_val_norm_denoise = normalization(denoise(X_train),denoise(X_val_bal))
+X_train_norm_denoise, X_val_norm_denoise = normalization(denoise(X_train), scalers), normalization(denoise(X_val_bal), scalers)
 np.savez_compressed(
     'denoised_eeg_data.npz',
     X_train=X_train_norm_denoise,
@@ -244,7 +249,7 @@ np.savez_compressed(
 )
 
 # This is the ONLY normalized one
-X_train_norm, X_val_norm = normalization(X_train,X_val_bal)
+X_train_norm, X_val_norm = normalization(X_train, scalers), normalization(X_val_bal, scalers)
 np.savez_compressed(
     'processed_eeg_data.npz',
     X_train=X_train_norm,
@@ -252,4 +257,8 @@ np.savez_compressed(
     y_train=y_train,
     y_val=y_val_bal
 )
+
+
+def create_sliding_window():
+    pass
 
