@@ -146,8 +146,9 @@ def wavelet_denoise(data, level=None, mode='soft'):
     return pywt.waverec(coeffs_thresh, wavelet)
 
 # This is the actual function to be called on to remove artifacts.
+# It will apply wavelet denoising to each channel of each sample. 
 def denoise(dataset):
-    denoised_dataset = np.zeros(dataset.shape)
+    denoised_dataset = np.zeros_like(dataset)
     for s in range (dataset.shape[0]):
         for c in range (dataset.shape[1]):
             # denoised_channel = wavelet_denoise(channel)
@@ -187,24 +188,48 @@ for i in range(5):
 
 ########## Normalization ##########
 
-def normalization(X_train, X_val_bal):
-    # 2D flatten the training data to (8282, 23*256)
-    # 2D flatten the validation data to (1462, 23*256)
-    X_train_2d = X_train.reshape(X_train.shape[0], -1)
-    X_val_bal_2d = X_val_bal.reshape(X_val_bal.shape[0], -1)
+def get_scalers(X_train):
+    scalers = {} # Storing scalers for each channel 
+    for c in range(X_train.shape[1]):
+        # Reshape to (samples * timesteps, 1)
+        # Fit on trainign data then apply to validation data
+        scaler = StandardScaler()
+        X_train_2d = X_train[:, c, :].reshape(-1, 1)
+        scaler.fit(X_train_2d)
+        scalers[c] = scaler 
 
-    # Standardize to mean = 0, standard deviation = 1
-    # Only using transform yet not fit for validation data because
-    # don't want model to know the fitting parameters!
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train_2d)
-    X_val_bal_scaled = scaler.transform(X_val_bal_2d)
+    return scalers
+    
+def normalization(X, scalers):
+    # # 2D flatten the training data to (8282, 23*256)
+    # # 2D flatten the validation data to (1462, 23*256)
+    # X_train_2d = X_train.reshape(X_train.shape[0], -1)
+    # X_val_bal_2d = X_val_bal.reshape(X_val_bal.shape[0], -1)
 
-    # Reshape training data from (8282, 23*256) to (8282, 23, 256)
-    # Reshape validation data from (1462, 23*256) to (1462, 23, 256)
-    X_train_final = X_train_scaled.reshape(X_train.shape)
-    X_val_bal_final = X_val_bal_scaled.reshape(X_val_bal.shape)
-    return X_train_final, X_val_bal_final
+    # # Standardize to mean = 0, standard deviation = 1
+    # # Only using transform yet not fit for validation data because
+    # # don't want model to know the fitting parameters!
+    # scaler = StandardScaler()
+    # X_train_scaled = scaler.fit_transform(X_train_2d)
+    # X_val_bal_scaled = scaler.transform(X_val_bal_2d)
+
+    # # Reshape training data from (8282, 23*256) to (8282, 23, 256)
+    # # Reshape validation data from (1462, 23*256) to (1462, 23, 256)
+    # X_train_final = X_train_scaled.reshape(X_train.shape)
+    # X_val_bal_final = X_val_bal_scaled.reshape(X_val_bal.shape)
+    # return X_train_final, X_val_bal_final
+
+    # Channel-wise normalization. 
+    # This maintains amplitude differences between channels. 
+    # Flattening everything destroys temporal information as it treats 
+    # each channel as the same. 
+    X_final = np.zeros_like(X)
+    for c in range(X.shape[1]):
+        X_2d = X[:, c, :].reshape(-1, 1)
+        # Transform data then reshape it back to per-sample format --> (Sample, 256)
+        X_scaled = scalers[c].transform(X_2d)
+        X_final[:, c, :] = X_scaled.reshape(X.shape[0], X.shape[2])
+    return X_final 
 
 ########## Saving Data ##########
 
