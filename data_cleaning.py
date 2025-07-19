@@ -147,11 +147,13 @@ def wavelet_denoise(data, level=None, mode='soft'):
 
 # This is the actual function to be called on to remove artifacts.
 def denoise(dataset):
-    denoised_dataset = []
-    for channel in dataset:
-        denoised_channel = wavelet_denoise(channel)
-        denoised_dataset.append(denoised_channel)
-    return np.array(denoised_dataset)
+    denoised_dataset = np.zeros(dataset.shape)
+    for s in range (dataset.shape[0]):
+        for c in range (dataset.shape[1]):
+            # denoised_channel = wavelet_denoise(channel)
+            # denoised_dataset.append(denoised_channel)
+            denoised_dataset[s, c] = wavelet_denoise(dataset[s, c])
+    return denoised_dataset
 
 # Plotting the first 5 graphs for visualization.
 for i in range(5):
