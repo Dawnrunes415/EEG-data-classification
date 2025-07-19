@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler
 ########## Loading the datasets ##########
 # Load the training dataset 
 
-path = '' # Change this to the location of your local data folder
+path = "D:\\Vanessa\\Documents\\eeg_data\\" # Change this to the location of your local data folder
 
 train_data = np.load(path+'eeg-predictive_train.npz')
 print(train_data.files) # Check the keys in the npz file
@@ -79,23 +79,26 @@ for i in range(5):
 '''
 
 ########## Noise removal using bandpass filter ##########
-def bandpass_filter(data, lowcut, highcut, fs, order=5):
+def create_bandpass_filter(lowcut, highcut, fs, order=5):
     nyq = 0.5 * fs
     # Normalize cutoff frequencies 
     low = lowcut / nyq
     high = highcut / nyq
     b, a = butter(order, [low, high], btype='band')
+    return b, a
 
+def bandpass_filter(data, b, a):
     # Apply the filter to each signal (each channel in each sample)
-    filtered = np.empty_like(data)
+    filtered = np.zeros_like(data)
     for i in range(data.shape[0]):      
         for c in range(data.shape[1]):  
             filtered[i, c, :] = filtfilt(b, a, data[i, c, :])
     return filtered
 
-X_train = bandpass_filter(X_train, lowcut=0.5, highcut=40, fs=256)
-X_val = bandpass_filter(X_val, lowcut=0.5, highcut=40, fs=256)
-X_val_bal = bandpass_filter(X_val_bal, lowcut=0.5, highcut=40, fs=256)
+b, a = create_bandpass_filter(lowcut=0.5, highcut=40, fs=256)
+X_train = bandpass_filter(X_train, b, a)
+X_val = bandpass_filter(X_val, b, a)
+X_val_bal = bandpass_filter(X_val_bal, b, a)
 
 ########## Artifacts removal ##########
 
@@ -146,12 +149,15 @@ def wavelet_denoise(data, level=None, mode='soft'):
     return pywt.waverec(coeffs_thresh, wavelet)
 
 # This is the actual function to be called on to remove artifacts.
+# It will apply wavelet denoising to each channel of each sample. 
 def denoise(dataset):
-    denoised_dataset = []
-    for channel in dataset:
-        denoised_channel = wavelet_denoise(channel)
-        denoised_dataset.append(denoised_channel)
-    return np.array(denoised_dataset)
+    denoised_dataset = np.zeros_like(dataset)
+    for s in range (dataset.shape[0]):
+        for c in range (dataset.shape[1]):
+            # denoised_channel = wavelet_denoise(channel)
+            # denoised_dataset.append(denoised_channel)
+            denoised_dataset[s, c] = wavelet_denoise(dataset[s, c])
+    return denoised_dataset
 
 # Plotting the first 5 graphs for visualization.
 for i in range(5):
@@ -185,29 +191,55 @@ for i in range(5):
 
 ########## Normalization ##########
 
-def normalization(X_train, X_val_bal):
-    # 2D flatten the training data to (8282, 23*256)
-    # 2D flatten the validation data to (1462, 23*256)
-    X_train_2d = X_train.reshape(X_train.shape[0], -1)
-    X_val_bal_2d = X_val_bal.reshape(X_val_bal.shape[0], -1)
+def get_scalers(X_train):
+    scalers = {} # Storing scalers for each channel 
+    for c in range(X_train.shape[1]):
+        # Reshape to (samples * timesteps, 1)
+        # Fit on trainign data then apply to validation data
+        scaler = StandardScaler()
+        X_train_2d = X_train[:, c, :].reshape(-1, 1)
+        scaler.fit(X_train_2d)
+        scalers[c] = scaler 
 
-    # Standardize to mean = 0, standard deviation = 1
-    # Only using transform yet not fit for validation data because
-    # don't want model to know the fitting parameters!
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train_2d)
-    X_val_bal_scaled = scaler.transform(X_val_bal_2d)
+    return scalers
+    
+def normalization(X, scalers):
+    # # 2D flatten the training data to (8282, 23*256)
+    # # 2D flatten the validation data to (1462, 23*256)
+    # X_train_2d = X_train.reshape(X_train.shape[0], -1)
+    # X_val_bal_2d = X_val_bal.reshape(X_val_bal.shape[0], -1)
 
-    # Reshape training data from (8282, 23*256) to (8282, 23, 256)
-    # Reshape validation data from (1462, 23*256) to (1462, 23, 256)
-    X_train_final = X_train_scaled.reshape(X_train.shape)
-    X_val_bal_final = X_val_bal_scaled.reshape(X_val_bal.shape)
-    return X_train_final, X_val_bal_final
+    # # Standardize to mean = 0, standard deviation = 1
+    # # Only using transform yet not fit for validation data because
+    # # don't want model to know the fitting parameters!
+    # scaler = StandardScaler()
+    # X_train_scaled = scaler.fit_transform(X_train_2d)
+    # X_val_bal_scaled = scaler.transform(X_val_bal_2d)
+
+    # # Reshape training data from (8282, 23*256) to (8282, 23, 256)
+    # # Reshape validation data from (1462, 23*256) to (1462, 23, 256)
+    # X_train_final = X_train_scaled.reshape(X_train.shape)
+    # X_val_bal_final = X_val_bal_scaled.reshape(X_val_bal.shape)
+    # return X_train_final, X_val_bal_final
+
+    # Channel-wise normalization. 
+    # This maintains amplitude differences between channels. 
+    # Flattening everything destroys temporal information as it treats 
+    # each channel as the same. 
+    X_final = np.zeros_like(X)
+    for c in range(X.shape[1]):
+        X_2d = X[:, c, :].reshape(-1, 1)
+        # Transform data then reshape it back to per-sample format --> (Sample, 256)
+        X_scaled = scalers[c].transform(X_2d)
+        X_final[:, c, :] = X_scaled.reshape(X.shape[0], X.shape[2])
+    return X_final 
 
 ########## Saving Data ##########
 
+scalers = get_scalers(X_train)
+
 # This is the denoised + normalized one
-X_train_norm_denoise, X_val_norm_denoise = normalization(denoise(X_train),denoise(X_val_bal))
+X_train_norm_denoise, X_val_norm_denoise = normalization(denoise(X_train), scalers), normalization(denoise(X_val_bal), scalers)
 np.savez_compressed(
     'denoised_eeg_data.npz',
     X_train=X_train_norm_denoise,
@@ -217,7 +249,7 @@ np.savez_compressed(
 )
 
 # This is the ONLY normalized one
-X_train_norm, X_val_norm = normalization(X_train,X_val_bal)
+X_train_norm, X_val_norm = normalization(X_train, scalers), normalization(X_val_bal, scalers)
 np.savez_compressed(
     'processed_eeg_data.npz',
     X_train=X_train_norm,
@@ -225,4 +257,8 @@ np.savez_compressed(
     y_train=y_train,
     y_val=y_val_bal
 )
+
+
+def create_sliding_window():
+    pass
 
