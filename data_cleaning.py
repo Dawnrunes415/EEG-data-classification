@@ -7,6 +7,15 @@ from scipy.signal import butter, filtfilt
 import pywt
 from sklearn.preprocessing import StandardScaler
 
+
+########## Variables ##########
+LOWCUT = 0.5
+HIGHCUT = 40
+FS = 256
+WINDOW_SIZE = 15 
+STEP_SIZE = 2
+PRED_SIZE = 30
+
 ########## Loading the datasets ##########
 # Load the training dataset 
 
@@ -95,7 +104,7 @@ def bandpass_filter(data, b, a):
             filtered[i, c, :] = filtfilt(b, a, data[i, c, :])
     return filtered
 
-b, a = create_bandpass_filter(lowcut=0.5, highcut=40, fs=256)
+b, a = create_bandpass_filter(lowcut=LOWCUT, highcut=HIGHCUT, fs=FS)
 X_train = bandpass_filter(X_train, b, a)
 X_val = bandpass_filter(X_val, b, a)
 X_val_bal = bandpass_filter(X_val_bal, b, a)
@@ -160,6 +169,10 @@ def denoise(dataset):
     return denoised_dataset
 
 # Plotting the first 5 graphs for visualization.
+ch_names = ['FP1-F7', 'F7-T7', 'T7-P7', 'P7-O1', 'FP1-F3', 'F3-C3', 'C3-P3','P3-O1',
+             'FP2-F4', 'F4-C4', 'C4-P4', 'P4-O2', 'FP2-F8', 'F8-T8', 'T8-P8', 'P8-O2',
+             'FZ-CZ', 'CZ-PZ', 'P7-T7', 'T7-FT9', 'FT9-FT10', 'FT10-T8', 'T8-P8']
+
 for i in range(5):
     sample_signal = X_train[i]
     denoised = denoise(sample_signal)
@@ -174,7 +187,7 @@ for i in range(5):
     for c in range(channels):
         time[c].plot(sample_signal[c], label="Raw")
         time[c].plot(denoised[c], label="Denoised")
-        time[c].set_ylabel(f"Ch {c+1}")
+        time[c].set_ylabel(ch_names[c])
         time[c].legend(loc='upper right')
     time[-1].set_xlabel("Time: 256 points")
 
@@ -234,31 +247,61 @@ def normalization(X, scalers):
         X_final[:, c, :] = X_scaled.reshape(X.shape[0], X.shape[2])
     return X_final 
 
+########## Create Sliding Windows ##########
+
+def create_sliding_window(X, y, window_size, step_size, prediction_size):
+    """
+    Creates sliding windows for data 
+    Parameters:
+        X: shape (N, 23, 256) 1-second samples
+        y: shape (N,) labels per sample (0/1)
+        window_size: seconds of EEG used as input
+        step_size: size to slide the window (seconds)
+        prediction_size: seconds into the future to check for seizure
+    """
+
+    X_windows = []
+    y_windows = []
+
+    total_samples = X.shape[0]
+
+    for i in range(0, total_samples - window_size - prediction_size + 1, step_size):
+        window = X[i : i + window_size] # Frome 0 to window_size
+        future_labels = y[i + window_size : i + window_size + prediction_size] # From end of window to end of prediction size
+        label = 1 if np.any(future_labels == 1) else 0 
+
+        X_windows.append(window)
+        y_windows.append(label)
+    
+    return np.array(X_windows), np.array(y_windows)
+
 ########## Saving Data ##########
 
 scalers = get_scalers(X_train)
 
 # This is the denoised + normalized one
-X_train_norm_denoise, X_val_norm_denoise = normalization(denoise(X_train), scalers), normalization(denoise(X_val_bal), scalers)
+X_train_denoised = denoise(X_train)
+X_val_denoised = denoise(X_val_bal)
+X_train_norm_denoise, X_val_norm_denoise = normalization(X_train_denoised, scalers), normalization(X_val_denoised, scalers)
+X_train_denoise_win, y_train_win = create_sliding_window(X_train_norm_denoise, y_train, WINDOW_SIZE, STEP_SIZE, PRED_SIZE)
+X_val_denoise_win, y_val_win = create_sliding_window(X_val_norm_denoise, y_val_bal, WINDOW_SIZE, STEP_SIZE, PRED_SIZE)
 np.savez_compressed(
     'denoised_eeg_data.npz',
-    X_train=X_train_norm_denoise,
-    X_val=X_val_norm_denoise,
-    y_train=y_train,
-    y_val=y_val_bal
+    X_train=X_train_denoise_win,
+    X_val=X_val_denoise_win,
+    y_train=y_train_win,
+    y_val=y_val_win
 )
 
 # This is the ONLY normalized one
 X_train_norm, X_val_norm = normalization(X_train, scalers), normalization(X_val_bal, scalers)
+X_train_win, y_train_win = create_sliding_window(X_train_norm, y_train, WINDOW_SIZE, STEP_SIZE, PRED_SIZE)
+X_val_win, y_val_win = create_sliding_window(X_val_norm, y_val_bal, WINDOW_SIZE, STEP_SIZE, PRED_SIZE)
 np.savez_compressed(
     'processed_eeg_data.npz',
-    X_train=X_train_norm,
-    X_val=X_val_norm,
-    y_train=y_train,
-    y_val=y_val_bal
+    X_train=X_train_win,
+    X_val=X_val_win,
+    y_train=y_train_win,
+    y_val=y_val_win
 )
-
-
-def create_sliding_window():
-    pass
 
