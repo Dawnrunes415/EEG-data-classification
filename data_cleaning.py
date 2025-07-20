@@ -22,7 +22,6 @@ PRED_SIZE = 30
 path = "D:\\Vanessa\\Documents\\eeg_data\\" # Change this to the location of your local data folder
 
 train_data = np.load(path+'eeg-predictive_train.npz')
-print(train_data.files) # Check the keys in the npz file
 X_train = train_data['train_signals']
 y_train = train_data['train_labels']
 
@@ -51,9 +50,13 @@ print("Train labels:", np.unique(y_train, return_counts=True))
 seizure_percent_train = np.sum(y_train == 1) / len(y_train) * 100
 print('% Seizure in the training set:', seizure_percent_train, '%') # 21.67%
 
-print("Balanced validation labels:", np.unique(y_val, return_counts=True))
+print("Validation labels:", np.unique(y_val, return_counts=True))
 seizure_percent_val = np.sum(y_val == 1) / len(y_val) * 100
-print('% Seizure in the bal.validation set:', seizure_percent_val, '%') # 22.44%
+print('% Seizure in the validation set:', seizure_percent_val, '%') # 22.44%
+
+print("Balanced Validation labels:", np.unique(y_val_bal, return_counts=True))
+seizure_percent_bal_val = np.sum(y_val_bal == 1) / len(y_val_bal) * 100
+print('% Seizure in the validation set:', seizure_percent_bal_val, '%')
 
 ########## Visualizing the data ##########
 
@@ -268,7 +271,21 @@ def create_sliding_window(X, y, window_size, step_size, prediction_size):
     for i in range(0, total_samples - window_size - prediction_size + 1, step_size):
         window = X[i : i + window_size] # Frome 0 to window_size
         future_labels = y[i + window_size : i + window_size + prediction_size] # From end of window to end of prediction size
-        label = 1 if np.any(future_labels == 1) else 0 
+        seizure_fraction = np.sum(future_labels) / prediction_size
+        label = 1 if seizure_fraction >= 0.2 else 0 
+
+        # If there are at least 5 consecutive 1s in the future labels, label it as seizure
+        # This is to avoid false seizure detection due to short spikes in the data
+        # count = 0
+        # label = 0
+        # for val in future_labels:
+        #     if val == 1:
+        #         count += 1
+        #         if count >= 3:
+        #             label = 1
+        #             break
+        #     else:
+        #         count = 0
 
         X_windows.append(window)
         y_windows.append(label)
@@ -281,10 +298,10 @@ scalers = get_scalers(X_train)
 
 # This is the denoised + normalized one
 X_train_denoised = denoise(X_train)
-X_val_denoised = denoise(X_val_bal)
+X_val_denoised = denoise(X_val)
 X_train_norm_denoise, X_val_norm_denoise = normalization(X_train_denoised, scalers), normalization(X_val_denoised, scalers)
 X_train_denoise_win, y_train_win = create_sliding_window(X_train_norm_denoise, y_train, WINDOW_SIZE, STEP_SIZE, PRED_SIZE)
-X_val_denoise_win, y_val_win = create_sliding_window(X_val_norm_denoise, y_val_bal, WINDOW_SIZE, STEP_SIZE, PRED_SIZE)
+X_val_denoise_win, y_val_win = create_sliding_window(X_val_norm_denoise, y_val, WINDOW_SIZE, STEP_SIZE, PRED_SIZE)
 np.savez_compressed(
     'denoised_eeg_data.npz',
     X_train=X_train_denoise_win,
@@ -294,9 +311,9 @@ np.savez_compressed(
 )
 
 # This is the ONLY normalized one
-X_train_norm, X_val_norm = normalization(X_train, scalers), normalization(X_val_bal, scalers)
+X_train_norm, X_val_norm = normalization(X_train, scalers), normalization(X_val, scalers)
 X_train_win, y_train_win = create_sliding_window(X_train_norm, y_train, WINDOW_SIZE, STEP_SIZE, PRED_SIZE)
-X_val_win, y_val_win = create_sliding_window(X_val_norm, y_val_bal, WINDOW_SIZE, STEP_SIZE, PRED_SIZE)
+X_val_win, y_val_win = create_sliding_window(X_val_norm, y_val, WINDOW_SIZE, STEP_SIZE, PRED_SIZE)
 np.savez_compressed(
     'processed_eeg_data.npz',
     X_train=X_train_win,
