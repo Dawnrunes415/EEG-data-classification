@@ -10,9 +10,9 @@ from sklearn.preprocessing import StandardScaler
 
 ########## Variables ##########
 LOWCUT = 0.5
-HIGHCUT = 40
+HIGHCUT = 40  
 FS = 256
-WINDOW_SIZE = 15 
+WINDOW_SIZE = 15
 STEP_SIZE = 2
 PRED_SIZE = 30
 
