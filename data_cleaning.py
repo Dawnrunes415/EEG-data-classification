@@ -13,7 +13,7 @@ LOWCUT = 0.5
 HIGHCUT = 40  
 FS = 256
 WINDOW_SIZE = 15
-STEP_SIZE = 2
+STEP_SIZE = 1
 PRED_SIZE = 30
 
 ########## Loading the datasets ##########
@@ -57,6 +57,25 @@ print('% Seizure in the validation set:', seizure_percent_val, '%') # 22.44%
 print("Balanced Validation labels:", np.unique(y_val_bal, return_counts=True))
 seizure_percent_bal_val = np.sum(y_val_bal == 1) / len(y_val_bal) * 100
 print('% Seizure in the validation set:', seizure_percent_bal_val, '%')
+
+
+########## Data Distribution ##########
+# print("Train mean:", np.mean(X_train), "Train std:", np.std(X_train), "Train perchannel mean:", np.mean(X_train, axis=(0, 2)), "Train perchannel std:", np.std(X_train, axis=(0, 2)))
+# print("Val mean:", np.mean(X_val), "Val std:", np.std(X_val), "Val perchannel mean:", np.mean(X_val, axis=(0, 2)), "Val perchannel std:", np.std(X_val, axis=(0, 2)))
+# print("Val_bal mean:", np.mean(X_val_bal), "Val_bal std:", np.std(X_val_bal), "Val_bal perchannel mean:", np.mean(X_val_bal, axis=(0, 2)), "Val_bal perchannel std:", np.std(X_val_bal, axis=(0, 2)))
+
+# import matplotlib.pyplot as plt
+
+# for i in range(5):  # Pick a few channels
+#     plt.figure()
+#     plt.hist(X_train[:, i, :].flatten(), bins=100, alpha=0.5, label='Train', density=True)
+#     plt.hist(X_val[:, i, :].flatten(), bins=100, alpha=0.5, label='Val', density=True)
+#     plt.title(f'Channel {i}')
+#     plt.legend()
+#     plt.show()
+
+# print(y_train[:50]) 
+# print(y_val[:50]) 
 
 ########## Visualizing the data ##########
 
@@ -176,34 +195,34 @@ ch_names = ['FP1-F7', 'F7-T7', 'T7-P7', 'P7-O1', 'FP1-F3', 'F3-C3', 'C3-P3','P3-
              'FP2-F4', 'F4-C4', 'C4-P4', 'P4-O2', 'FP2-F8', 'F8-T8', 'T8-P8', 'P8-O2',
              'FZ-CZ', 'CZ-PZ', 'P7-T7', 'T7-FT9', 'FT9-FT10', 'FT10-T8', 'T8-P8']
 
-for i in range(5):
-    sample_signal = X_train[i]
-    denoised = denoise(sample_signal)
+# for i in range(5):
+#     sample_signal = X_train[i]
+#     denoised = denoise(sample_signal)
 
-    # These should give 23 and 256 
-    channels = sample_signal.shape[0]
-    time_points = sample_signal.shape[1]
+#     # These should give 23 and 256 
+#     channels = sample_signal.shape[0]
+#     time_points = sample_signal.shape[1]
 
-    eeg, time = plt.subplots(channels, 1, figsize=(10, 20), sharex=True)
+#     eeg, time = plt.subplots(channels, 1, figsize=(10, 20), sharex=True)
 
-    # Assign names for the channels 1-23
-    for c in range(channels):
-        time[c].plot(sample_signal[c], label="Raw")
-        time[c].plot(denoised[c], label="Denoised")
-        time[c].set_ylabel(ch_names[c])
-        time[c].legend(loc='upper right')
-    time[-1].set_xlabel("Time: 256 points")
+#     # Assign names for the channels 1-23
+#     for c in range(channels):
+#         time[c].plot(sample_signal[c], label="Raw")
+#         time[c].plot(denoised[c], label="Denoised")
+#         time[c].set_ylabel(ch_names[c])
+#         time[c].legend(loc='upper right')
+#     time[-1].set_xlabel("Time: 256 points")
 
-    # Convert the labels to string
-    if int(y_train[i]) == 1:
-        label = "Seizure"
-    else: 
-        label = "Not Seizure"
-    eeg.suptitle(f"EEG Sample {i+1} - Label: {label}")
-    plt.tight_layout(rect=[0, 0, 1, 0.97])
-    # Save the figure into the eeg_graphs folder
-    plt.savefig(f"eeg_denoised_graphs/sample_{i+1}.png")
-    plt.close()
+#     # Convert the labels to string
+#     if int(y_train[i]) == 1:
+#         label = "Seizure"
+#     else: 
+#         label = "Not Seizure"
+#     eeg.suptitle(f"EEG Sample {i+1} - Label: {label}")
+#     plt.tight_layout(rect=[0, 0, 1, 0.97])
+#     # Save the figure into the eeg_graphs folder
+#     plt.savefig(f"eeg_denoised_graphs/sample_{i+1}.png")
+#     plt.close()
 
 ########## Normalization ##########
 
@@ -272,7 +291,7 @@ def create_sliding_window(X, y, window_size, step_size, prediction_size):
         window = X[i : i + window_size] # Frome 0 to window_size
         future_labels = y[i + window_size : i + window_size + prediction_size] # From end of window to end of prediction size
         seizure_fraction = np.sum(future_labels) / prediction_size
-        label = 1 if seizure_fraction >= 0.2 else 0 
+        label = 1 if seizure_fraction >= 0.3 else 0 
 
         # If there are at least 5 consecutive 1s in the future labels, label it as seizure
         # This is to avoid false seizure detection due to short spikes in the data
@@ -310,6 +329,14 @@ np.savez_compressed(
     y_val=y_val_win
 )
 
+# np.savez_compressed(
+#     'denoised_eeg_data.npz',
+#     X_train=X_train_norm_denoise,
+#     X_val=X_val_norm_denoise,
+#     y_train=y_train,
+#     y_val=y_val_bal
+# )
+
 # This is the ONLY normalized one
 X_train_norm, X_val_norm = normalization(X_train, scalers), normalization(X_val, scalers)
 X_train_win, y_train_win = create_sliding_window(X_train_norm, y_train, WINDOW_SIZE, STEP_SIZE, PRED_SIZE)
@@ -321,4 +348,12 @@ np.savez_compressed(
     y_train=y_train_win,
     y_val=y_val_win
 )
+
+# np.savez_compressed(
+#     'processed_eeg_data.npz',
+#     X_train=X_train_norm,
+#     X_val=X_val_norm,
+#     y_train=y_train,
+#     y_val=y_val_bal
+# )
 
