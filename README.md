@@ -20,8 +20,6 @@ The system classifies whether a seizure will occur within the next 30 seconds, a
 
 Our model combines **Convolutional Neural Networks (CNNs)** for feature extraction with **Long Short-Term Memory (LSTM)** networks for temporal modeling, providing robust performance on time-series EEG data.
 
----
-
 ## Features
 
 - Preprocessing pipeline for multi-channel EEG signals
@@ -34,23 +32,17 @@ Our model combines **Convolutional Neural Networks (CNNs)** for feature extracti
   - Prediction probability distributions
   - Classification reports
 
----
-
 ## Dataset
 
 - **Source:** [EEG Seizure Analysis Dataset](https://www.kaggle.com/datasets/adibadea/chbmitseizuredataset)
 - **Description:** EEG recordings from pediatric subjects with intractable seizures.
 - **Format:** Each sample is a window of EEG data with shape `(channels, timesteps)`.
 
----
-
 ## Model Architecture
 
 - **CNN Layers:** Extract local spatial patterns from EEG channels
 - **LSTM Layers:** Capture long-term temporal dependencies
 - **Fully Connected Layers:** Classify preictal vs. non-preictal states
-
----
 
 ## Results
 
@@ -61,8 +53,6 @@ Our model combines **Convolutional Neural Networks (CNNs)** for feature extracti
 - **Validation F1-score**: ~0.83
 
 - **False Negative Rate (FNR)**: ~0.13
-
----
 
 ## License
 
